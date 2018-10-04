@@ -7,30 +7,85 @@ from Cryptodome.PublicKey import RSA
 from Cryptodome.Hash import SHA3_512
 from typing import List
 from copy import deepcopy
+from config import ME, DIFFICULTY, TRANSACTION_MIN, NUM_KEY_BITS
 
-from config import ME, DIFFICULTY
+
+def to_dict(obj):
+    """
+    Recursively goes through fields and adds them to dictionary
+    :param obj: User, Transaction, Block, or Blockchain object
+    :return: a dictionary representation of obj
+    """
+    t = type(obj)
+    assert t == User or t == Transaction or t == Block or t == Blockchain, \
+        'You cannot call this function on unapproved types'
+    dictified = dict()
+    for name, value in obj.__dict__.items():
+        t = type(value)
+        if t == User or t == Transaction or t == Block or t == Blockchain:
+            dictified[name] = to_dict(value.public_version())
+        else:
+            dictified[name] = value
+    return dictified
 
 
-# thanks stack overflow
-def to_dict(obj, class_key=None):
-    if isinstance(obj, dict):
-        data = {}
-        for (k, v) in obj.items():
-            data[k] = to_dict(v, class_key)
-        return data
-    elif hasattr(obj, "_ast"):
-        return to_dict(obj._ast())
-    elif hasattr(obj, "__iter__") and not isinstance(obj, str):
-        return [to_dict(v, class_key) for v in obj]
-    elif hasattr(obj, "__dict__"):
-        data = dict([(key, to_dict(value, class_key))
-                     for key, value in obj.__dict__.items()
-                     if not callable(value) and not key.startswith('_')])
-        if class_key is not None and hasattr(obj, "__class__"):
-            data[class_key] = obj.__class__.__name__
-        return data
+def to_json(obj):
+    """
+    Converts obj to dictionary and then turns that into a string
+    :param obj: User, Transaction, Block, or Blockchain object
+    :return: string representation of obj
+    """
+    t = type(obj)
+    assert t == User or t == Transaction or t == Block or t == Blockchain, \
+        'You cannot call this function on unapproved types'
+    if t != User and obj.signature is not None:
+        assert obj.is_valid(), 'You cannot export an invalid object'
+    return json.dumps(to_dict(obj), sort_keys=True)
+
+
+def hasher(obj):
+    """
+    :param obj: object to return updated hasher of
+    :return: SHA3_512 hasher object
+    """
+    t = type(obj)
+    assert t == Transaction or t == Block or t == bytes, \
+        'You cannot call this function on unapproved types'
+    return SHA3_512.new().update(obj if t == bytes else to_json(obj).encode())
+
+
+def valid_signature(obj):
+    """
+    :param obj: a Transaction or Block object
+    :return: if the signature is valid
+    """
+    if type(obj) == Transaction:
+        public_key = RSA.import_key(obj.sender.public_key)
+    elif type(obj) == Block:
+        public_key = RSA.import_key(obj.miner.public_key)
     else:
-        return obj
+        raise AssertionError('Object is not of Transaction or Block type')
+    assert obj.signature is not None
+    copy = obj.public_version()
+    copy.signature = None
+    verifier = pkcs1_15.new(public_key)
+    try:
+        verifier.verify(hasher(copy), obj.signature)
+    except ValueError:
+        return False
+    return True
+
+
+def timestamp(obj):
+    """
+    :param obj: object to timestamp field 'time'
+    :return:
+    """
+    t = type(obj)
+    assert t == Transaction or t == Block, \
+        'You cannot call this function on unapproved types'
+    assert obj.time is None, 'This ' + str(t.__name__) + ' has already been timestamped'
+    obj.time = datetime.utcfromtimestamp(time()).strftime('%Y-%m-%d %H:%M:%S')
 
 
 @dataclass
@@ -47,66 +102,40 @@ class User:
     def generate_key_pair(self):
         assert self.public_key is None, 'This user already has a public key'
         assert self.private_key is None, 'This user already has a private key'
-        key_pair = RSA.generate(2048)
+        key_pair = RSA.generate(NUM_KEY_BITS)
         self.private_key = key_pair.export_key().decode()
         self.public_key = key_pair.publickey().export_key().decode()
 
-    def sign(self, message):
+    def sign(self, obj):
         """
         Only use for when you have the private key
-        :param message: message to sign
-        :return: signature for message
+        :param obj: Block or Transaction to sign
         """
+        t = type(obj)
+        assert t == Transaction or t == Block, \
+            'You cannot call this function on unapproved types'
+        assert obj.signature is None, 'This ' + str(t.__name__) + ' is already signed'
         key = RSA.import_key(self.private_key)
         assert RSA.RsaKey.has_private(key), 'Invalid private key'
         signer = pkcs1_15.new(key)
-        hasher = SHA3_512.new().update(message)
-        return signer.sign(hasher)
+        obj.signature = signer.sign(hasher(obj))
 
     def public_version(self):
         copy = deepcopy(self)
         copy.private_key = None
-    def to_json(self):
-        """
-        :return: jsonified User WITHOUT private_key
-        """
-        return json.dumps(to_dict(self.public_version()), sort_keys=True).encode()
+        return copy
 
 
-def user_from_json(user_json):
+def user_from_json(user_json_str):
     """
-    :param user_json: User WITHOUT private_key
+    :param user_json_str: json.loads-ifiable string
     :return: User object
     """
-    return User(alias=user_json['alias'],
-                hashed_id=user_json['hashed_id'],
-                public_key=user_json['public_key'] if 'public_key' in user_json else None)
-
-
-def valid_signature(obj):
-    """
-    :param obj: a Transaction or Block object
-    :return: if the signature is valid
-    """
-    if type(obj) == Transaction:
-        public_key = RSA.import_key(obj.sender.public_key)
-    elif type(obj) == Block:
-        public_key = RSA.import_key(obj.miner.public_key)
-    else:
-        raise AssertionError('Object is not of Transaction or Block type')
-    copy = deepcopy(obj.public_version())
-    copy.signature = None
-    verifier = pkcs1_15.new(public_key)
-    hasher = SHA3_512.new().update(copy.to_json())
-    try:
-        verifier.verify(hasher, obj.signature)
-    except ValueError:
-        return False
-    return True
-
-
-def timestamp():
-    return datetime.utcfromtimestamp(time()).strftime('%Y-%m-%d %H:%M:%S')
+    user_dict = json.loads(user_json_str)
+    return User(alias=user_dict['alias'],
+                hashed_id=user_dict['hashed_id'],
+                public_key=user_dict['public_key'] if not 'None' else None,
+                private_key=user_dict['private_key'] if not 'None' else None)
 
 
 @dataclass
@@ -121,17 +150,8 @@ class Transaction:
     signature: str = None
 
     def __post_init__(self):
-        """
-        Checks if it was created from JSON or by itself
-        If created by itself, it timestamps and signs itself
-        This requires the miner to be the owner and having a valid private key
-        """
-        self.sender = deepcopy(self.sender)
-        self.recipient = deepcopy(self.recipient)
         if self.time is None:
-            self.time = timestamp()
-        if self.signature is None:
-            self.sign()
+            timestamp(self)
 
     def public_version(self):
         copy = deepcopy(self)
@@ -139,28 +159,15 @@ class Transaction:
         copy.recipient.private_key = None
         return copy
 
-    def sign(self):
-        """
-        The miner (assuming they have a valid private key) signs the transaction
-        """
-        assert self.signature is None, 'This transaction is already signed'
-        self.signature = self.sender.sign(self.to_json())
-
     def is_valid(self):
         """
         :return: if the signature and value are valid
         """
         if not valid_signature(self):
             return False
-        if self.value <= 0:
+        if self.value <= TRANSACTION_MIN:
             return False
         return True
-
-    def to_json(self):
-        """
-        :return: jsonified Transaction
-        """
-        return json.dumps(to_dict(self.public_version()), sort_keys=True).encode()
 
 
 def transaction_from_json(transaction_json):
@@ -171,8 +178,8 @@ def transaction_from_json(transaction_json):
     return Transaction(sender=user_from_json(transaction_json['miner']),
                        recipient=user_from_json(transaction_json['recipient']),
                        value=transaction_json['value'],
-                       time=transaction_json['time'] if 'time' in transaction_json else None,
-                       signature=transaction_json['signature'] if 'signature' in transaction_json else None)
+                       time=transaction_json['time'],
+                       signature=transaction_json['signature'])
 
 
 @dataclass
@@ -180,21 +187,15 @@ class Block:
     """
     Block class where the default constructor returns the genesis block
     """
-    prev_hash: str = '0' * DIFFICULTY
-    transactions: List[Transaction] = None
-    miner: User = user_from_json(ME)
+    prev_hash: str
+    transactions: List[Transaction]
+    miner: User
     time: str = None
     nonce: int = 0
     signature: str = None
 
     def __post_init__(self):
-        if self.transactions is None:
-            self.transactions = []
-        self.miner = deepcopy(self.miner)
-        if self.miner.private_key is None and self.miner.public_key is None:
-            self.miner.generate_key_pair()
-        if time is None:
-            self.time = timestamp()
+        timestamp(self)
 
     def public_version(self):
         """
@@ -204,29 +205,19 @@ class Block:
         copy.miner.private_key = None
         return copy
 
-    def hash(self, premade_dict=None):
+    def hash(self, premade_json_str=None):
         """
-        :param premade_dict: premade dict
+        :param premade_json_str: premade json string
         (used in mining so you don't have to remake the dictionary every time)
         :return: hash of object without miner's private key and
         """
         # a premade dictionary allows for faster mining
-        if premade_dict is not None:
-            assert premade_dict['miner']['private_key'] is None
-            assert premade_dict['signature'] is None, 'You cannot hash a signed block'
-            return SHA3_512.new().update(
-                json.dumps(premade_dict, sort_keys=True).encode()).hexdigest()
+        if premade_json_str is not None:
+            return hasher(premade_json_str.encode()).hexdigest()
         else:
             copy = self.public_version()
             copy.signature = None
-            return SHA3_512.new().update(copy.to_json()).hexdigest()
-
-    def sign(self):
-        """
-        :return: signature of block without signature
-        """
-        assert self.signature is None, 'This block is already signed'
-        self.signature = self.miner.sign(self.to_json())
+            return hasher(to_json(copy).encode()).hexdigest()
 
     def transactions_valid(self):
         for transaction in self.transactions:
@@ -244,19 +235,22 @@ class Block:
                     and the hash has appropriate proof of work
         """
         return self.difficulty_valid() and \
-            valid_signature(self) and \
-            self.transactions_valid()
+               valid_signature(self) and \
+               self.transactions_valid()
 
     def mine(self):
         assert self.signature is None, 'You cannot mine a signed block'
         assert self.transactions_valid(), 'You cannot mine an invalid block'
-        premade = to_dict(self.public_version())
-        while not self.difficulty_valid(premade):
-            premade['nonce'] += 1
-        self.nonce = premade['nonce']
-
-    def to_json(self):
-        return json.dumps(to_dict(self.public_version()), sort_keys=True).encode()
+        assert self.nonce == 0, 'The nonce has already been modified'
+        premade_json_str = to_json(self)
+        nonce_str = '"nonce": '
+        nonce_index = int(premade_json_str.find(nonce_str)) + len(nonce_str)
+        nonce = 0
+        while not self.difficulty_valid(premade_json_str):
+            premade_json_str = premade_json_str[:nonce_index] + \
+                               premade_json_str[nonce_index:].replace(str(nonce), str(nonce + 1), 1)
+            nonce += 1
+        self.nonce = nonce
 
 
 def block_from_json(block_json):
@@ -271,12 +265,21 @@ def block_from_json(block_json):
 @dataclass
 class Blockchain:
     chain: List[Block] = None
+    owner: User = user_from_json(ME)
+    transactions: List[Transaction] = None
 
     def __post_init__(self):
+        """
+        Generates genesis block
+        """
+        if self.transactions is None:
+            self.transactions = []
+        if self.owner.public_key is None and self.owner.private_key is None:
+            self.owner.generate_key_pair()
         if self.chain is None:
-            block = Block()
+            block = Block('0' * DIFFICULTY, [], self.owner)
             block.mine()
-            block.sign()
+            self.owner.sign(block)
             self.chain = [block]
 
     def is_valid(self):
@@ -296,15 +299,15 @@ class Blockchain:
             prev_block = block
         return True
 
-    def to_json(self):
-        assert self.is_valid(), 'You cannot export an invalid blockchain'
-        return json.dumps(to_dict(self), sort_keys=True).encode()
+    def submit_transaction(self, transaction):
+        assert transaction.is_valid()
+        self.transactions.append(transaction)
 
 
-def blockchain_from_json(blockchain_json):
+def blockchain_from_json(blockchain_json_str):
     """
-    :param blockchain_json: jsonified blockchain object
+    :param blockchain_json_str: jsonified blockchain string
     :return: Blockchain object
     """
-    return Blockchain(chain=json.loads(blockchain_json['chain']))
-
+    blockchain_json = json.loads(blockchain_json_str)
+    return Blockchain(chain=blockchain_json['chain'])

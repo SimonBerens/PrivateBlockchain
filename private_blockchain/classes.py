@@ -7,12 +7,13 @@ from Cryptodome.PublicKey import RSA
 from Cryptodome.Hash import SHA3_512
 from typing import List
 from copy import deepcopy
-from config import ME, DIFFICULTY, TRANSACTION_MIN, NUM_KEY_BITS
+from private_blockchain.settings import ME, DIFFICULTY, TRANSACTION_MIN, NUM_KEY_BITS
 
 
-def to_dict(obj):
+def to_dict(obj, omit_signature=False):
     """
     Recursively goes through fields and adds them to dictionary
+    :param omit_signature: whether or not to take the signature into account
     :param obj: User, Transaction, Block, or Blockchain object
     :return: a dictionary representation of obj
     """
@@ -21,26 +22,27 @@ def to_dict(obj):
         'You cannot call this function on unapproved types'
     dictified = dict()
     for name, value in obj.__dict__.items():
-        t = type(value)
-        if t == User or t == Transaction or t == Block or t == Blockchain:
-            dictified[name] = to_dict(value.public_version())
+        tv = type(value)
+        if tv == User or tv == Transaction or tv == Block or tv == Blockchain:
+            dictified[name] = to_dict(value.public_version(), omit_signature)
         else:
             dictified[name] = value
+    if t != User and t != Blockchain and omit_signature:
+        dictified['signature'] = None
     return dictified
 
 
-def to_json(obj):
+def to_json(obj, omit_signature=False):
     """
     Converts obj to dictionary and then turns that into a string
+    :param omit_signature: whether or not to take the signature into account
     :param obj: User, Transaction, Block, or Blockchain object
     :return: string representation of obj
     """
     t = type(obj)
     assert t == User or t == Transaction or t == Block or t == Blockchain, \
         'You cannot call this function on unapproved types'
-    if t != User and obj.signature is not None:
-        assert obj.is_valid(), 'You cannot export an invalid object'
-    return json.dumps(to_dict(obj), sort_keys=True)
+    return json.dumps(to_dict(obj, omit_signature), sort_keys=True)
 
 
 def hasher(obj):
@@ -51,7 +53,7 @@ def hasher(obj):
     t = type(obj)
     assert t == Transaction or t == Block or t == bytes, \
         'You cannot call this function on unapproved types'
-    return SHA3_512.new().update(obj if t == bytes else to_json(obj).encode())
+    return SHA3_512.new().update(obj if t == bytes else to_json(obj, omit_signature=True).encode())
 
 
 def valid_signature(obj):
@@ -59,18 +61,17 @@ def valid_signature(obj):
     :param obj: a Transaction or Block object
     :return: if the signature is valid
     """
-    if type(obj) == Transaction:
+    t = type(obj)
+    if t == Transaction:
         public_key = RSA.import_key(obj.sender.public_key)
-    elif type(obj) == Block:
+    elif t == Block:
         public_key = RSA.import_key(obj.miner.public_key)
     else:
         raise AssertionError('Object is not of Transaction or Block type')
-    assert obj.signature is not None
-    copy = obj.public_version()
-    copy.signature = None
+    assert obj.signature is not None, 'A ' + str(t.__name__) + ' cannot be valid without a signature'
     verifier = pkcs1_15.new(public_key)
     try:
-        verifier.verify(hasher(copy), obj.signature)
+        verifier.verify(hasher(obj), obj.signature)
     except ValueError:
         return False
     return True
@@ -98,6 +99,12 @@ class User:
     hashed_id: str
     public_key: str = None
     private_key: str = None
+
+    def __post_init__(self):
+        if self.public_key == 'None':
+            self.public_key = None
+        if self.private_key == 'None':
+            self.private_key = None
 
     def generate_key_pair(self):
         assert self.public_key is None, 'This user already has a public key'
@@ -134,8 +141,8 @@ def user_from_json(user_json_str):
     user_dict = json.loads(user_json_str)
     return User(alias=user_dict['alias'],
                 hashed_id=user_dict['hashed_id'],
-                public_key=user_dict['public_key'] if not 'None' else None,
-                private_key=user_dict['private_key'] if not 'None' else None)
+                public_key=user_dict['public_key'],
+                private_key=user_dict['private_key'])
 
 
 @dataclass
@@ -199,25 +206,11 @@ class Block:
 
     def public_version(self):
         """
-        :return: Block stripped miner's private_key
+        :return: Block stripped of miner's private_key
         """
         copy = deepcopy(self)
         copy.miner.private_key = None
         return copy
-
-    def hash(self, premade_json_str=None):
-        """
-        :param premade_json_str: premade json string
-        (used in mining so you don't have to remake the dictionary every time)
-        :return: hash of object without miner's private key and
-        """
-        # a premade dictionary allows for faster mining
-        if premade_json_str is not None:
-            return hasher(premade_json_str.encode()).hexdigest()
-        else:
-            copy = self.public_version()
-            copy.signature = None
-            return hasher(to_json(copy).encode()).hexdigest()
 
     def transactions_valid(self):
         for transaction in self.transactions:
@@ -225,8 +218,13 @@ class Block:
                 return False
         return True
 
-    def difficulty_valid(self, premade_dict=None):
-        return self.hash(premade_dict)[:DIFFICULTY] == '0' * DIFFICULTY
+    def difficulty_valid(self, premade_json_str=None):
+        for_mining = premade_json_str is not None
+        if for_mining:
+            h = hasher(premade_json_str.encode()).hexdigest()
+        else:
+            h = hasher(self).hexdigest()
+        return h[:DIFFICULTY] == '0' * DIFFICULTY
 
     def is_valid(self):
         """
@@ -294,7 +292,7 @@ class Blockchain:
         for block in self.chain[1:]:
             if not block.is_valid():
                 return False
-            if prev_block.hash() != block.prev_hash:
+            if hasher(prev_block).hexdigest() != block.prev_hash:
                 return False
             prev_block = block
         return True
@@ -311,3 +309,7 @@ def blockchain_from_json(blockchain_json_str):
     """
     blockchain_json = json.loads(blockchain_json_str)
     return Blockchain(chain=blockchain_json['chain'])
+
+
+c = Blockchain()
+print(c.is_valid())

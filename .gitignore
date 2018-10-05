@@ -1,3 +1,4 @@
 .idea/
 PrivateBlockchain.iml
-instance
+instance/
+venv/

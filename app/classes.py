@@ -7,7 +7,7 @@ from Cryptodome.PublicKey import RSA
 from Cryptodome.Hash import SHA3_512
 from typing import List
 from copy import deepcopy
-from package.private_blockchain.settings import DIFFICULTY, TRANSACTION_MIN, NUM_KEY_BITS
+from config import DIFFICULTY, TRANSACTION_MIN_VALUE, NUM_KEY_BITS
 
 
 def check_valid_type(obj, *args):
@@ -105,7 +105,7 @@ class Transaction:
         self.recipient = self.recipient.public_version()
 
     def is_valid(self):
-        return self.value <= TRANSACTION_MIN
+        return self.value <= TRANSACTION_MIN_VALUE
 
 
 @dataclass

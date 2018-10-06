@@ -92,6 +92,38 @@ def user_from_json_str(user_json_str):
 
 
 @dataclass
+class Message:
+    sender: User
+    data: str
+    time: str = None
+    signature: str = None
+
+    def __post_init__(self):
+        self.sender = self.sender.public_version()
+        if self.time is None:
+            self.timestamp()
+
+    def valid_signature(self):
+        """
+        :return: if the signature of the messages data is valid
+        """
+        public_key = RSA.import_key(self.sender.public_key)
+        verifier = pkcs1_15.new(public_key)
+        try:
+            verifier.verify(hasher(self.data), self.signature)
+        except ValueError:
+            return False
+        return True
+
+    def is_valid(self):
+        return self.data.is_valid() and self.valid_signature()
+
+    def timestamp(self):
+        assert self.time is None, 'This ' + str(type(self).__name__) + ' has already been timestamped'
+        self.time = datetime.utcfromtimestamp(time()).strftime('%Y-%m-%d %H:%M:%S')
+
+
+@dataclass
 class Transaction:
     """
     Class for storing transactions to allow for easy verification
@@ -109,13 +141,21 @@ class Transaction:
 
 
 @dataclass
+class TransactionMessage(Message):
+    sender: User
+    data: Transaction
+    time: str = None
+    signature: str = None
+
+
+@dataclass
 class Block:
     """
     Block class where the default constructor returns the genesis block
     """
     prev_hash: str
     miner: User
-    transactions: List[Transaction] = None
+    transactions: List[TransactionMessage] = None
     nonce: int = 0
 
     def __post_init__(self):
@@ -159,62 +199,47 @@ class Block:
 
 
 @dataclass
-class Message:
-    sender: User
-    data: Transaction or Block
-    time: str = None
-    signature: str = None
-
-    def __post_init__(self):
-        self.sender = self.sender.public_version()
-
-    def valid_signature(self):
-        """
-        :return: if the signature of the messages data is valid
-        """
-        public_key = RSA.import_key(self.sender.public_key)
-        verifier = pkcs1_15.new(public_key)
-        try:
-            verifier.verify(hasher(self.data), self.signature)
-        except ValueError:
-            return False
-        return True
-
-    def is_valid(self):
-        return self.data.is_valid() and self.valid_signature()
-
-    def timestamp(self):
-        assert self.time is None, 'This ' + str(type(self).__name__) + ' has already been timestamped'
-        self.time = datetime.utcfromtimestamp(time()).strftime('%Y-%m-%d %H:%M:%S')
-
-
-@dataclass
-class TransactionMessage(Message):
-    sender: User
-    data: Transaction or Block
-    time: str = None
-    signature: str = None
-
-
-@dataclass
 class BlockMessage(Message):
     sender: User
-    data: Transaction or Block
+    data: Block
     time: str = None
     signature: str = None
 
 
 @dataclass
 class Blockchain:
-    owner: User
     chain: List[BlockMessage] = None
     transactions: List[TransactionMessage] = None
 
     def __post_init__(self):
         if self.chain is None:
-            genesis = Block('00', self.owner)
-            genesis.mine()
-            self.chain = [BlockMessage(self.owner, genesis)]
+            self.chain = []
+        if self.transactions is None:
+            self.transactions = []
+
+    def genesis(self, owner):
+        assert check_valid_type(owner, 'User')
+        assert self.chain == [], 'This Blockchain has already been initialized'
+        genesis_block = Block('00', owner)
+        genesis_block.mine()
+        genesis_message = BlockMessage(owner, genesis_block)
+        owner.sign(genesis_message)
+
+    def submit_transaction(self, transaction_message):
+        assert check_valid_type(transaction_message, 'TransactionMessage')
+        assert transaction_message.is_valid()
+        self.transactions.append(transaction_message)
+
+    def mine_transactions(self, miner):
+        assert check_valid_type(miner, 'User'), 'This is not a valid miner'
+        assert miner.private_key is not None, 'This User cannot sign messsages'
+        prev_hash = '00' if len(self.chain) is 0 else self.chain[0].data.prev_hash
+        block = Block(prev_hash, miner, self.transactions)
+        block.mine()
+        message = BlockMessage(miner, block)
+        miner.sign(message)
+        assert message.is_valid()
+        self.chain.append(message)
 
     def is_valid(self):
         """

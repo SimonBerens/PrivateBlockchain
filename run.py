@@ -1,5 +1,5 @@
-from app import flask_app
+from blockchain import app
 
 
 if __name__ == '__main__':
-    flask_app.run(host=flask_app.config['HOST'], port=flask_app.config['PORT'])
+    app.run(host=app.config['HOST'], port=app.config['PORT'])

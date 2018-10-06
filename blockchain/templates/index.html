@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+{#    For nav load#}
+    <meta name="select" content="home">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title> Home </title>
+{#    Vendor CSS#}
+    <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
+{#    Custom CSS#}
+    <link href="{{ url_for('static', filename='custom/navbar.css') }}" rel="stylesheet">
+</head>
+<body>
+{% for message in block_messages %}
+
+    <div class='col-sm-4 col-md-offset-4'>
+        <div class='card'>
+            <div class='card-body'>
+                <h5 class='card-title'> Block </h5>
+                <h6 class='card-subtitle mb-2 text-muted' >  </h6>
+                <p class='card-text'> Miner: {{ message.sender }}</p>
+                <p class='card-text'> Block: <a href="/block?number={{ loop.index }}"> </a> </p>
+                <p class='card-text'> Signature: {{ message.signature }}</p>
+            </div>
+        </div>
+    </div>
+{% endfor %}
+
+
+{# Vendor JS#}
+<script src="{{ url_for('static', filename='vendor/jquery-3.3.1.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/popper.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/bootstrap.min.js') }}"></script>
+{# Custom JS#}
+<script src="{{ url_for('static', filename='custom/navload.js') }}"></script>
+</body>
+</html>

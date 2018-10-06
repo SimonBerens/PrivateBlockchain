@@ -1,6 +1,6 @@
 #  Deployment settings
-HOST = '127.0.0.1'
-PORT = '5000'
+HOST = '0.0.0.0'
+PORT = '80'
 
 #  Cryptographic strength constants
 DIFFICULTY = 2
@@ -12,3 +12,6 @@ MIN_TRANSACTIONS_IN_BLOCK = 1
 
 #  Name of private blockchain to display in html
 CHAIN_NAME = 'Private Blockchain'
+
+#  JSON string of user
+ME = '{"alias": "Simon", "hashed_id": "00", "private_key": null, "public_key": null}'

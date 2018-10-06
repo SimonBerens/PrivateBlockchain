@@ -2,19 +2,21 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>{{ chain_name }}</title>
+{#    For nav load#}
+    <meta name="select" content="submit">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title> Submit </title>
 {#    Vendor CSS#}
     <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
 {#    Custom CSS#}
+    <link href="{{ url_for('static', filename='custom/navbar.css') }}" rel="stylesheet">
 </head>
 <body>
-<div id="welcome">
-    <h1> Welcome to {{ chain_name }} </h1>
-</div>
-<button type="button" class="btn btn-primary">Hello</button>
 {# Vendor JS#}
 <script src="{{ url_for('static', filename='vendor/jquery-3.3.1.min.js') }}"></script>
 <script src="{{ url_for('static', filename='vendor/popper.min.js') }}"></script>
 <script src="{{ url_for('static', filename='vendor/bootstrap.min.js') }}"></script>
+{# Custom JS#}
+<script src="{{ url_for('static', filename='custom/navload.js') }}"></script>
 </body>
 </html>

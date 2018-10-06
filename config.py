@@ -1,4 +1,6 @@
 #  Deployment settings
+import json
+
 HOST = '0.0.0.0'
 PORT = '80'
 
@@ -14,4 +16,12 @@ MIN_TRANSACTIONS_IN_BLOCK = 1
 CHAIN_NAME = 'Private Blockchain'
 
 #  JSON string of user
-ME = '{"alias": "Simon", "hashed_id": "00", "private_key": null, "public_key": null}'
+f = open('me.json', 'r+')
+ME = json.loads(f.read())
+f.close()
+f = open('users.json', 'r+')
+USERS = json.loads(f.read())
+f.close()
+f = open('nodes.json', 'r+')
+NODES = json.loads(f.read())
+f.close()

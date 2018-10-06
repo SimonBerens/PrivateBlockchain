@@ -10,7 +10,7 @@ def get_chain():
 
 @app.route('/api/nodes')
 def get_nodes():
-    return jsonify(list(nodes)), 200
+    return jsonify(nodes), 200
 
 
 @app.route('/api/users')

@@ -51,7 +51,6 @@ class User:
     private_key: str = None
 
     def __post_init__(self):
-        #  easier to do this here than in user_from_json_str
         if self.public_key == 'None':
             self.public_key = None
         if self.private_key == 'None':
@@ -83,8 +82,7 @@ class User:
         return copy
 
 
-def user_from_json_str(user_json_str):
-    user_dict = json.loads(user_json_str)
+def user_from_dict(user_dict):
     return User(alias=user_dict['alias'],
                 hashed_id=user_dict['hashed_id'],
                 public_key=user_dict['public_key'],
@@ -116,7 +114,7 @@ class Message:
         return True
 
     def is_valid(self):
-        return self.data.is_valid() and self.valid_signature()
+        return self.valid_signature()
 
     def timestamp(self):
         assert self.time is None, 'This ' + str(type(self).__name__) + ' has already been timestamped'
@@ -146,6 +144,9 @@ class TransactionMessage(Message):
     data: Transaction
     time: str = None
     signature: str = None
+
+    def is_valid(self):
+        return self.is_valid() and self.valid_signature()
 
 
 @dataclass
@@ -205,9 +206,15 @@ class BlockMessage(Message):
     time: str = None
     signature: str = None
 
+    def is_valid(self):
+        return self.is_valid() and self.valid_signature()
+
 
 @dataclass
 class Blockchain:
+    """
+
+    """
     chain: List[BlockMessage] = None
     transactions: List[TransactionMessage] = None
 

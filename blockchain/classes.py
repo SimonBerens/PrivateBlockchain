@@ -7,7 +7,7 @@ from Cryptodome.PublicKey import RSA
 from Cryptodome.Hash import SHA3_512
 from typing import List
 from copy import deepcopy
-from config import DIFFICULTY, TRANSACTION_MIN_VALUE, NUM_KEY_BITS
+from config import DIFFICULTY, TRANSACTION_MIN_VALUE, NUM_KEY_BITS, USERS
 
 
 def check_valid_type(obj, *args):
@@ -135,7 +135,18 @@ class Transaction:
         self.recipient = self.recipient.public_version()
 
     def is_valid(self):
-        return self.value <= TRANSACTION_MIN_VALUE
+        if not self.value <= TRANSACTION_MIN_VALUE:
+            return False
+        sender_valid = False
+        recipient_valid = False
+        for user in USERS:
+            for k, v in user.items():
+                if k == 'public_key':
+                    if v == self.sender.public_key:
+                        sender_valid = True
+                    if v == self.recipient.public_key:
+                        recipient_valid = True
+        return sender_valid and recipient_valid
 
 
 @dataclass
@@ -146,7 +157,7 @@ class TransactionMessage(Message):
     signature: str = None
 
     def is_valid(self):
-        return self.is_valid() and self.valid_signature()
+        return super(self).is_valid() and self.data.is_valid()
 
 
 @dataclass
@@ -183,7 +194,14 @@ class Block:
         :return: if all the transactions are valid
                     and the hash has appropriate proof of work
         """
-        return self.difficulty_valid() and self.transactions_valid()
+        if not self.difficulty_valid() and self.transactions_valid():
+            return False
+        for user in USERS:
+            for k, v in user.items():
+                if k == 'public_key':
+                    if v == self.miner.public_key:
+                        return True
+        return False
 
     def mine(self):
         assert self.transactions_valid(), 'You cannot mine an invalid block'
@@ -207,7 +225,7 @@ class BlockMessage(Message):
     signature: str = None
 
     def is_valid(self):
-        return self.is_valid() and self.valid_signature()
+        return super(self).is_valid() and self.data.is_valid()
 
 
 @dataclass

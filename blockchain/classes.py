@@ -1,34 +1,40 @@
-import json
-from dataclasses import dataclass
-from time import time
-from datetime import datetime
-from Cryptodome.Signature import pkcs1_15
-from Cryptodome.PublicKey import RSA
-from Cryptodome.Hash import SHA3_512
-from typing import List
 from copy import deepcopy
-from config import DIFFICULTY, TRANSACTION_MIN_VALUE, NUM_KEY_BITS, USERS
+from dataclasses import dataclass
+from datetime import datetime
+from time import time
+from typing import List
+
+from Cryptodome.Hash import SHA3_512
+from Cryptodome.PublicKey import RSA
+from Cryptodome.Signature import pkcs1_15
+
+from blockchain.chain_settings import *
 
 
-def check_valid_type(obj, *args):
-    if len(args) == 0:
-        args = ['User', 'Transaction', 'Block', 'Blockchain', 'TransactionMessage', 'BlockMessage']
-    return type(obj).__name__ in list(args)
+def valid_type(obj, *args):
+    return type(obj).__name__ in args
 
 
-def to_dict(obj):
-    """
-    Recursively goes through fields and adds them to dictionary
-    Requires for object to be one of the defined classes
-    """
-    assert check_valid_type(obj)
-    dictified = dict()
-    for name, value in obj.__dict__.items():
-        if check_valid_type(value):
-            dictified[name] = to_dict(value)
-        else:
-            dictified[name] = value
-    return dictified
+#  stack overflow
+def to_dict(obj, class_key=None):
+    if isinstance(obj, dict):
+        data = {}
+        for (k, v) in obj.items():
+            data[k] = to_dict(v, class_key)
+        return data
+    elif hasattr(obj, "_ast"):
+        return to_dict(obj._ast())
+    elif hasattr(obj, "__iter__") and not isinstance(obj, str):
+        return [to_dict(v, class_key) for v in obj]
+    elif hasattr(obj, "__dict__"):
+        data = dict([(key, to_dict(value, class_key))
+                     for key, value in obj.__dict__.items()
+                     if not callable(value) and not key.startswith('_')])
+        if class_key is not None and hasattr(obj, "__class__"):
+            data[class_key] = obj.__class__.__name__
+        return data
+    else:
+        return obj
 
 
 def to_json(obj):
@@ -39,7 +45,7 @@ def hasher(obj):
     """
     :return: SHA3_512 hasher object
     """
-    assert check_valid_type(obj, 'Transaction', 'Block', 'bytes')
+    assert valid_type(obj, 'Transaction', 'Block', 'bytes')
     return SHA3_512.new().update(obj if type(obj) == bytes else to_json(obj).encode())
 
 
@@ -47,14 +53,8 @@ def hasher(obj):
 class User:
     alias: str
     hashed_id: str
-    public_key: str = None
-    private_key: str = None
-
-    def __post_init__(self):
-        if self.public_key == 'None':
-            self.public_key = None
-        if self.private_key == 'None':
-            self.private_key = None
+    public_key: str
+    private_key: str
 
     def generate_key_pair(self):
         assert self.public_key is None, 'This user already has a public key'
@@ -63,17 +63,17 @@ class User:
         self.private_key = key_pair.export_key().decode()
         self.public_key = key_pair.publickey().export_key().decode()
 
-    def sign(self, message):
+    def sign(self, obj):
         """
         Only use for when you have the private key
-        :param message: Block or Transaction to sign
+        :param obj: Block or Transaction to sign
         """
-        assert check_valid_type(message, 'TransactionMessage', 'BlockMessage')
-        assert message.signature is None, 'This Message is already signed'
+        assert valid_type(obj, 'Transaction', 'Block')
+        assert obj.signature is None, 'This Message is already signed'
         key = RSA.import_key(self.private_key)
         assert RSA.RsaKey.has_private(key), 'Invalid private key'
         signer = pkcs1_15.new(key)
-        message.signature = signer.sign(hasher(message.data))
+        obj.signature = signer.sign(hasher(obj)).hex()
 
     def public_version(self):
         #  this will be used in various post-inits
@@ -89,36 +89,29 @@ def user_from_dict(user_dict):
                 private_key=user_dict['private_key'])
 
 
-@dataclass
-class Message:
-    sender: User
-    data: str
-    time: str = None
-    signature: str = None
+def valid_signature(obj):
+    """
+    :return: if the signature of the messages data is valid
+    """
+    assert valid_type(obj, 'Transaction', 'Block')
+    assert obj.signature is not None, "This block hasn't been signed"
+    if type(obj) == Transaction:
+        sender = obj.sender
+    else:
+        sender = obj.miner
+    public_key = RSA.import_key(sender.public_key)
+    verifier = pkcs1_15.new(public_key)
+    copy = deepcopy(obj)
+    copy.signature = None
+    try:
+        verifier.verify(hasher(copy), bytearray.fromhex(obj.signature))
+    except ValueError:
+        return False
+    return True
 
-    def __post_init__(self):
-        self.sender = self.sender.public_version()
-        if self.time is None:
-            self.timestamp()
 
-    def valid_signature(self):
-        """
-        :return: if the signature of the messages data is valid
-        """
-        public_key = RSA.import_key(self.sender.public_key)
-        verifier = pkcs1_15.new(public_key)
-        try:
-            verifier.verify(hasher(self.data), self.signature)
-        except ValueError:
-            return False
-        return True
-
-    def is_valid(self):
-        return self.valid_signature()
-
-    def timestamp(self):
-        assert self.time is None, 'This ' + str(type(self).__name__) + ' has already been timestamped'
-        self.time = datetime.utcfromtimestamp(time()).strftime('%Y-%m-%d %H:%M:%S')
+def timestamp():
+    return datetime.utcfromtimestamp(time()).strftime('%Y-%m-%d %H:%M:%S')
 
 
 @dataclass
@@ -128,36 +121,44 @@ class Transaction:
     """
     sender: User
     recipient: User
-    value: float
+    value: int
+    fee: int
+    time: str = None
+    signature: str = None
 
     def __post_init__(self):
         self.sender = self.sender.public_version()
         self.recipient = self.recipient.public_version()
+        if self.signature == 'None':
+            self.signature = None
+        if self.time == 'None':
+            self.time = None
+        if self.time is None:
+            self.time = timestamp()
 
     def is_valid(self):
-        if not self.value <= TRANSACTION_MIN_VALUE:
+        if self.value < TRANSACTION_MIN_VALUE:
+            return False
+        if not valid_signature(self):
             return False
         sender_valid = False
         recipient_valid = False
         for user in USERS:
-            for k, v in user.items():
-                if k == 'public_key':
-                    if v == self.sender.public_key:
-                        sender_valid = True
-                    if v == self.recipient.public_key:
-                        recipient_valid = True
+            p_k = user['public_key']
+            if p_k == self.sender.public_key:
+                sender_valid = True
+            if p_k == self.recipient.public_key:
+                recipient_valid = True
         return sender_valid and recipient_valid
 
 
-@dataclass
-class TransactionMessage(Message):
-    sender: User
-    data: Transaction
-    time: str = None
-    signature: str = None
-
-    def is_valid(self):
-        return super(self).is_valid() and self.data.is_valid()
+def transaction_from_dict(transaction_dict):
+    return Transaction(sender=user_from_dict(transaction_dict['sender']),
+                       recipient=user_from_dict(transaction_dict['recipient']),
+                       value=transaction_dict['value'],
+                       fee=transaction_dict['fee'],
+                       time=transaction_dict['time'],
+                       signature=transaction_dict['signature'])
 
 
 @dataclass
@@ -167,26 +168,36 @@ class Block:
     """
     prev_hash: str
     miner: User
-    transactions: List[TransactionMessage] = None
+    transactions: List[Transaction]
     nonce: int = 0
+    time: str = None
+    signature: str = None
 
     def __post_init__(self):
-        if self.transactions is None:
-            self.transactions = []
         self.miner = self.miner.public_version()
+        if self.time == 'None':
+            self.time = None
+        if self.time is None:
+            self.time = timestamp()
+        if self.nonce == '0':
+            self.nonce = 0
 
     def transactions_valid(self):
+        total = 0
         for transaction in self.transactions:
             if not transaction.is_valid():
                 return False
-        return True
+            total += transaction.fee
+        return total >= TOTAL_TRANSACTION_FEE
 
     def difficulty_valid(self, premade_json_str=None):
         for_mining = premade_json_str is not None
         if for_mining:
             h = hasher(premade_json_str.encode()).hexdigest()
         else:
+            temp, self.signature = self.signature, None
             h = hasher(self).hexdigest()
+            self.signature = temp
         return h[:DIFFICULTY] == '0' * DIFFICULTY
 
     def is_valid(self):
@@ -194,13 +205,16 @@ class Block:
         :return: if all the transactions are valid
                     and the hash has appropriate proof of work
         """
-        if not self.difficulty_valid() and self.transactions_valid():
+        if not self.difficulty_valid():
+            return False
+        if not self.transactions_valid():
+            return False
+        if not valid_signature(self):
             return False
         for user in USERS:
-            for k, v in user.items():
-                if k == 'public_key':
-                    if v == self.miner.public_key:
-                        return True
+            p_k = user['public_key']
+            if p_k == self.miner.public_key:
+                return True
         return False
 
     def mine(self):
@@ -217,68 +231,73 @@ class Block:
         self.nonce = nonce
 
 
-@dataclass
-class BlockMessage(Message):
-    sender: User
-    data: Block
-    time: str = None
-    signature: str = None
-
-    def is_valid(self):
-        return super(self).is_valid() and self.data.is_valid()
+def block_from_dict(block_dict):
+    return Block(prev_hash=block_dict['prev_hash'],
+                 miner=user_from_dict(block_dict['miner']),
+                 transactions=[transaction_from_dict(transaction)
+                               for transaction in block_dict['transactions']],
+                 nonce=block_dict['nonce'],
+                 time=block_dict['time'],
+                 signature=block_dict['signature'])
 
 
 @dataclass
 class Blockchain:
-    """
-
-    """
-    chain: List[BlockMessage] = None
-    transactions: List[TransactionMessage] = None
+    chain: List[Block] = None
+    transactions: List[Transaction] = None
 
     def __post_init__(self):
-        if self.chain is None:
-            self.chain = []
+        if self.chain is 'None':
+            self.chain = None
+        if self.transactions is 'None':
+            self.transactions = None
         if self.transactions is None:
             self.transactions = []
+        if self.chain is None:
+            self.chain = []
 
-    def genesis(self, owner):
-        assert check_valid_type(owner, 'User')
-        assert self.chain == [], 'This Blockchain has already been initialized'
-        genesis_block = Block('00', owner)
-        genesis_block.mine()
-        genesis_message = BlockMessage(owner, genesis_block)
-        owner.sign(genesis_message)
-
-    def submit_transaction(self, transaction_message):
-        assert check_valid_type(transaction_message, 'TransactionMessage')
-        assert transaction_message.is_valid()
-        self.transactions.append(transaction_message)
-
-    def mine_transactions(self, miner):
-        assert check_valid_type(miner, 'User'), 'This is not a valid miner'
-        assert miner.private_key is not None, 'This User cannot sign messsages'
-        prev_hash = '00' if len(self.chain) is 0 else self.chain[0].data.prev_hash
-        block = Block(prev_hash, miner, self.transactions)
-        block.mine()
-        message = BlockMessage(miner, block)
-        miner.sign(message)
-        assert message.is_valid()
-        self.chain.append(message)
+    def compute_balances(self):
+        users = dict()
+        for block in self.chain:
+            reward = 0
+            for transaction in block.transactions:
+                if transaction.sender.public_key not in users:
+                    users[transaction.sender.public_key] = -(transaction.value + transaction.fee)
+                else:
+                    users[transaction.sender.public_key] -= (transaction.value + transaction.fee)
+                if transaction.recipient.public_key not in users:
+                    users[transaction.recipient.public_key] = transaction.value
+                else:
+                    users[transaction.recipient.public_key] += transaction.value
+                reward += transaction.fee
+            if block.miner.public_key not in users:
+                users[block.miner.public_key] = reward + BASE_MINER_REWARD
+            else:
+                users[block.miner.public_key] += reward + BASE_MINER_REWARD
+        return users
 
     def is_valid(self):
         """
-        :return: if all the blocks are valid
-                and the hash pointers are correct
+        :return: if all the blocks are valid,
+                all the hash pointers are correct,
+                all the users have a positive balance,
+                all coinbase transactions are legitimate
         """
         genesis = self.chain[0]
         if not genesis.is_valid():
             return False
-        prev_block_message = genesis
-        for block_message in self.chain[1:]:
-            if not block_message.is_valid():
+        prev_block = genesis
+        for block in self.chain[1:]:
+            if not block.is_valid():
                 return False
-            if hasher(prev_block_message.data).hexdigest() != block_message.data.prev_hash:
+            if hasher(prev_block).hexdigest() != block.prev_hash:
                 return False
-            prev_block_message = block_message
-        return True
+            prev_block = block
+        return all([balance >= 0 for user, balance in self.compute_balances()])
+
+
+def blockchain_from_dict(blockchain_dict):
+    return Blockchain([block_from_dict(block)
+                       for block in blockchain_dict['chain']],
+                      [transaction_from_dict(transaction)
+                       for transaction in blockchain_dict['transactions']])

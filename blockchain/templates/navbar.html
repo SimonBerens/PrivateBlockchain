@@ -1,29 +1,67 @@
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>{% block title %} {% endblock %}</title>
+    <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='custom/navbar.css') }}" rel="stylesheet">
+    {% block css %}
+    {% endblock %}
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark sticky-top">
     <div class="container" >
-    <a class="navbar-brand">{{chain_name}}</a>
-    <ul class="navbar-nav">
-        <li class="nav-item">
-            <a id="home" class="nav-link" href="/"> Home </a>
-        </li>
-        <li class="nav-item">
-            <a id="login" class="nav-link" href="/login"> Login </a>
-        </li>
-        <li class="nav-item">
-            <a id="submit" class="nav-link" href="/submit"> Submit Transaction </a>
-        </li>
-        <li class="nav-item dropdown">
-            <button id="api" class="btn btn-outline-primary dropdown-toggle" type="button" data-toggle="dropdown"> API </button>
-            <div class="dropdown-menu">
-                <a class="dropdown-item" href="/api/chain">Chain</a>
-                <a class="dropdown-item" href="/api/nodes">Nodes</a>
-                <a class="dropdown-item" href="/api/users">Users</a>
-            </div>
-        </li>
-    </ul>
+        <a class="navbar-brand">{{ name }}</a>
+        <ul class="navbar-nav">
+            <li class="nav-item">
+                <a id="home" class="nav-link" href="/"> Home </a>
+            </li>
+            <li class="nav-item">
+                <a id="claim" class="nav-link" href="/claim"> Claim User </a>
+            </li>
+            <li class="nav-item">
+                <a id="profile" class="nav-link" href="/profile"> Profile </a>
+            </li>
+            <li class="nav-item">
+                <a id="submit" class="nav-link" href="/submit"> Submit Transaction </a>
+            </li>
+            <li class="nav-item dropdown">
+                <button id="api" class="btn btn-outline-primary dropdown-toggle" type="button" data-toggle="dropdown">
+                    API
+                </button>
+                <div class="dropdown-menu">
+                    <a class="dropdown-item" href="/api/log">Log</a>
+                    <a class="dropdown-item" href="/api/chain">Chain</a>
+                    <a class="dropdown-item" href="/api/nodes">Nodes</a>
+                    <a class="dropdown-item" href="/api/users">Users</a>
+                </div>
+            </li>
+        </ul>
     </div>
 </nav>
+<div class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }}" role="alert">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+</div>
+{% block content %}
+{% endblock %}
+{# Vendor JS#}
+<script src="{{ url_for('static', filename='vendor/jquery-3.3.1.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/popper.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/bootstrap.min.js') }}"></script>
+{# Custom JS#}
+{% block js %}
+{% endblock %}
 <script>
-    $(() => {
-        $('#{{ selected }}').addClass('selected')
-    })
+    $('#{{ selected }}').addClass('selected')
 </script>
+</body>
+</html>

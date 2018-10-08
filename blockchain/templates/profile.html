@@ -1,0 +1,41 @@
+{% extends "navbar.html" %}
+{% block content %}
+    <div class="container" align="center">
+        <div class="col-sm-4">
+            <form onsubmit="return false;">
+                <label for="unhashed_id"> <strong> Look Up Your Profile By ID </strong> </label>
+                <input id="unhashed_id" type="text" class="form-control" style="margin-bottom: 1%"
+                       placeholder="Unhashed ID">
+                <input id="go" type="button" class="btn btn-primary form-control" value="Submit"
+                       style="margin-bottom: 1%">
+            </form>
+            <form onsubmit="return false;">
+                <input id="alias" class="form-control" placeholder="Alias" style="margin-bottom: 1%">
+                <input id="balance" class="form-control" placeholder="Balance" style="margin-bottom: 1%">
+                <textarea id="key" class="form-control" placeholder="Public Key" rows="15"
+                          style="margin-bottom: 1%"></textarea>
+            </form>
+        </div>
+    </div>
+{% endblock %}
+{% block js %}
+    <script>
+        $(() => {
+            $('#go').click(() => {
+                $.ajax({
+                    url: '{{ my_url }}/api/user_info',
+                    type: 'GET',
+                    data: {
+                        id: $('#unhashed_id').val()
+                    },
+                    success: (response) => {
+                        $('#alias').val(response['alias']);
+                        $('#balance').val(response['balance']);
+                        $('#key').val(response['key']);
+
+                    }
+                })
+            })
+        })
+    </script>
+{% endblock %}

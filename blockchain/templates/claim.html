@@ -1,0 +1,15 @@
+{% extends "navbar.html" %}
+{% block content %}
+    <div class="container" align="center">
+        <form action="" method="post">
+            {{ form.hidden_tag() }}
+            <div class="form-group col-sm-4">
+                <strong> <label> Register your ID on the blockchain </label></strong>
+                {{ form.unhashed_id }}
+            </div>
+            <div class="form-group col-sm-4">
+                {{ form.submit }}
+            </div>
+        </form>
+    </div>
+{% endblock %}

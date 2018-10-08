@@ -1,2 +1,5 @@
+requests
+wtforms
 flask
 pycryptodomex
+flask_wtf

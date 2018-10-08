@@ -1,22 +1,35 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-{#    For nav load#}
-    <meta name="select" content="submit">
-    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-    <title> Submit </title>
-{#    Vendor CSS#}
-    <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
-{#    Custom CSS#}
-    <link href="{{ url_for('static', filename='custom/navbar.css') }}" rel="stylesheet">
-</head>
-<body>
-{# Vendor JS#}
-<script src="{{ url_for('static', filename='vendor/jquery-3.3.1.min.js') }}"></script>
-<script src="{{ url_for('static', filename='vendor/popper.min.js') }}"></script>
-<script src="{{ url_for('static', filename='vendor/bootstrap.min.js') }}"></script>
-{# Custom JS#}
-<script src="{{ url_for('static', filename='custom/navload.js') }}"></script>
-</body>
-</html>
+{% extends "navbar.html" %}
+{% block title %} Submit {% endblock %}
+{% block content %}
+    <div class="container">
+        <div align="center"><strong> <label> Submit a Transaction </label> </strong></div>
+        <form action="" method="post">
+            {{ form.hidden_tag() }}
+            <div class="row">
+                <div class="col form-group">
+                    {{ form.sender_public_key }}
+                </div>
+                <div class="col form-group">
+                    {{ form.recipient_public_key }}
+                </div>
+            </div>
+            <div class="form-group">
+                {{ form.s_private_key.label }}
+                {{ form.s_private_key }}
+            </div>
+            <div class="row form-group">
+                {{ form.value.label(class='col-form-label col-sm-1') }}
+                <div class="col-sm">
+                    {{ form.value }}
+                </div>
+                {{ form.fee.label(class='col-form-label col-sm-1') }}
+                <div class="col-sm" style="margin-bottom: 1%">
+                    {{ form.fee }}
+                </div>
+                <div class="col-sm-3">
+                    {{ form.submit }}
+                </div>
+            </div>
+        </form>
+    </div>
+{% endblock %}

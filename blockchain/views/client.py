@@ -1,5 +1,5 @@
 import requests
-from flask import render_template, redirect, flash
+from flask import render_template, redirect, flash, session
 
 from blockchain import app, my_chain, chain_settings, MY_URL, log, me
 from blockchain.classes import *
@@ -23,6 +23,10 @@ def spread_message(api_url, json_data, success_url, fail_url):
     else:
         flash('The majority did not accept. Your reason: ' + log[-1]['message'], 'danger')
         return redirect(fail_url)
+
+
+def escape(string):
+    return to_json(string)
 
 
 @app.context_processor
@@ -50,12 +54,16 @@ def index():
 def claim_user():
     form = ClaimForm()
     if form.validate_on_submit():
+        if 'my_public_key' not in session:
+            session['my_public_key'] = form.public_key.data
+        if 'my_unhashed_id' not in session:
+            session['my_unhashed_id'] = form.unhashed_id.data
         return spread_message(api_url='accept_user',
                               json_data=to_json({
                                   'id': form.unhashed_id.data,
-                                  'alias': me.alias,
-                                  'node_url': MY_URL,
-                                  'public_key': me.public_key,
+                                  'alias': form.alias.data,
+                                  'node_url': form.node_url.data,
+                                  'public_key': form.public_key.data.encode().decode('unicode_escape'),
                               }),
                               success_url='/profile',
                               fail_url='/claim')
@@ -90,6 +98,10 @@ def submit():
         fields['time'] = timestamp()
         transaction = transaction_from_dict(fields)
         sender.sign(transaction)
+        if 'my_public_key' not in session:
+            session['my_public_key'] = form.sender_public_key.data
+        if 'my_private_key' not in session:
+            session['my_private_key'] = form.s_private_key.data
         return spread_message(api_url='accept_transaction',
                               json_data=to_json(transaction),
                               success_url='/',

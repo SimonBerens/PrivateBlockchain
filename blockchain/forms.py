@@ -17,23 +17,40 @@ class TransactionForm(FlaskForm):
     s_private_key = TextAreaField('Sender Private Key',
                                   validators=[DataRequired()],
                                   render_kw={'class': 'form-control',
+                                             'placeholder': 'Sender Private Key',
                                              'rows': 7})
     value = IntegerField('Value',
                          validators=[DataRequired()],
-                         render_kw={'class': 'form-control'})
+                         render_kw={'class': 'form-control',
+                                    'placeholder': 'Value'})
     fee = IntegerField('Fee',
                        validators=[DataRequired()],
-                       render_kw={'class': 'form-control'})
+                       render_kw={'class': 'form-control',
+                                  'placeholder': 'Fee'})
     submit = SubmitField('Submit',
                          validators=[DataRequired()],
                          render_kw={'class': 'form-control btn btn-primary'})
 
 
 class ClaimForm(FlaskForm):
-    unhashed_id = StringField('ID',
+    unhashed_id = StringField('Register your ID on the blockchain',
                               validators=[DataRequired()],
                               render_kw={'class': 'form-control',
                                          'placeholder': 'Unhashed ID'})
+    alias = StringField('Alias',
+                              validators=[DataRequired()],
+                              render_kw={'class': 'form-control',
+                                         'placeholder': 'Alias'})
+
+    node_url = StringField('ID',
+                              validators=[DataRequired()],
+                              render_kw={'class': 'form-control',
+                                         'placeholder': 'Node URL'})
+    public_key = TextAreaField('Alias',
+                               validators=[DataRequired()],
+                               render_kw={'class': 'form-control',
+                                          'placeholder': 'Public Key',
+                                          'rows': 15})
     submit = SubmitField('Submit',
                          validators=[DataRequired()],
                          render_kw={'class': 'form-control btn btn-primary'})

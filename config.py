@@ -4,4 +4,4 @@ PROTOCOL = 'http'
 HOST = '0.0.0.0'
 PORT = '80'
 DEBUG = False
-SECRET_KEY = rand(64).hex()
+SECRET_KEY = rand(64)

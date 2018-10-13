@@ -35,6 +35,7 @@ def get_users():
 def get_user_info():
     user_id = request.args.get('id')
     if user_id is None:
+        print('here')
         return jsonify(message="No user id given"), 408
     hashed_id = hasher(user_id.encode()).hexdigest()
     for user in USERS:
@@ -92,7 +93,7 @@ def accept_user():
                 NODES.append(args['node_url'])
                 return jsonify(message="Success! User claimed"), 200
     else:
-        return jsonify(message="That id did not match any of my hashed id's"), 408
+        return jsonify(message="That id did not match any hashed id's"), 408
 
 
 @app.route('/api/accept_transaction', methods=['POST'])

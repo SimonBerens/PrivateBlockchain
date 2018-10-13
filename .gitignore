@@ -2,6 +2,6 @@
 PrivateBlockchain.iml
 instance/
 venv/
-/me.json
-/nodes.json
-/users.json
+me.json
+nodes.json
+users.json

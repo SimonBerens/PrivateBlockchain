@@ -1,5 +1,9 @@
 # PrivateBlockchain
 
+#### Note
+This project was made with educational intent and should probably not be used for any serious financial transactions
+
+####
 #### Todos:
 * ~~finish HTML~~
 * ~~verify coinbase transactions~~

@@ -7,7 +7,7 @@ from flask import Flask
 from blockchain.classes import *
 
 app = Flask(__name__, instance_relative_config=True)
-app.config.from_pyfile('config.py')
+app.config.from_pyfile('/config.py')
 MY_URL = f'{app.config["PROTOCOL"]}://{app.config["HOST"]}:{app.config["PORT"]}'
 
 # Setup nodes

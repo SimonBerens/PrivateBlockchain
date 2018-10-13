@@ -51,6 +51,12 @@ def hasher(obj):
 
 @dataclass
 class User:
+    """
+    This stores user variables and allows for easy data manipulation
+
+    Attributes:
+
+    """
     alias: str
     hashed_id: str
     public_key: str

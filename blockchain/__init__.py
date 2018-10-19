@@ -1,52 +1,26 @@
-import json
-import os
-
 import requests
 from flask import Flask
 
+from blockchain.chain_settings import *
 from blockchain.classes import *
 
 app = Flask(__name__, instance_relative_config=True)
-app.config.from_pyfile('/config.py')
-MY_URL = f'{app.config["PROTOCOL"]}://{app.config["HOST"]}:{app.config["PORT"]}'
+app.config.from_pyfile('config.py')
 
-# Setup nodes
-if os.path.exists('nodes.json'):
-    with open('nodes.json', 'r') as f:
-        try:
-            NODES = json.load(f.read())
-        except ValueError:
-            exit('Please provide a valid nodes file')
-else:
-    with open('nodes.json', 'w+') as f:
-        nodes_str = f'["{BOOTNODE}", "{MY_URL}"]'
-        NODES = json.loads(nodes_str)
-        f.write(nodes_str)
+me = user_from_dict(ME)
+try:
+    me.generate_key_pair()
+except AssertionError:
+    pass
 
-# Setup self
-if os.path.exists('me.json'):
-    with open('me.json', 'r') as f:
-        try:
-            me = user_from_dict(json.load(f.read()))
-        except ValueError:
-            exit('Please provide a valid me file')
-else:
-    with open('me.json', 'w+') as f:
-        me_str = f'{{"alias": "Anon", "hashed_id": "0", "private_key": "null", "public_key": "null"}}'
-        me = user_from_dict(json.loads(me_str))
-        me.generate_key_pair()
-        f.write(to_json(me))
+for user in USERS:
+    if user['hashed_id'] == me.hashed_id:
+        if user['public_key'] is None:
+            user['public_key'] = me.public_key
+            user['alias'] = me.alias
 
-
-# Setup users
-if os.path.exists('users.json'):
-    with open('users.json', 'r') as f:
-        try:
-            USERS = json.load(f.read())
-        except ValueError:
-            exit('Please provide a valid users file')
-else:
-    exit('For this to function you need a premade users file')
+if app.config['MY_URL'] != BOOTNODE:
+    add_node(BOOTNODE)
 
 my_chain = Blockchain()
 genesis_transaction = Transaction(me, me, TRANSACTION_MIN_VALUE, TOTAL_TRANSACTION_FEE)
@@ -65,9 +39,8 @@ def mine_transactions():
     my_chain.chain.append(block)
     my_chain.transactions = []
     for node in NODES:
-        if node != MY_URL:
-            requests.post(f'{node}/api/accept_blockchain',
-                          json=to_json(my_chain))
+        requests.post(f'{node}/api/accept_blockchain',
+                      json=to_json(my_chain))
 
 
 import blockchain.views.client

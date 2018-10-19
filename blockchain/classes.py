@@ -9,6 +9,7 @@ from Cryptodome.PublicKey import RSA
 from Cryptodome.Signature import pkcs1_15
 
 from blockchain.chain_settings import *
+from blockchain import USERS, NODES
 
 
 def valid_type(obj, *args):
@@ -37,13 +38,26 @@ def to_dict(obj, class_key=None):
         return obj
 
 
-def to_json(obj):
+def to_json(obj) -> str:
+    """
+    Converts obj to dictionary and json dumps it
+
+    Args:
+        :param obj: object to convert to json string
+    Returns:
+        :return: jsonified string of obj (NOT flask response)
+    """
     return json.dumps(to_dict(obj), sort_keys=True)
 
 
 def hasher(obj):
     """
-    :return: SHA3_512 hasher object
+    Creates a SHA3_512 hasher object updated with the obj param
+
+    Args:
+        :param obj: bytes or obj to update hasher with
+    Returns:
+        :return: SHA3_512 hasher object
     """
     assert valid_type(obj, 'Transaction', 'Block', 'bytes')
     return SHA3_512.new().update(obj if type(obj) == bytes else to_json(obj).encode())
@@ -55,14 +69,21 @@ class User:
     This stores user variables and allows for easy data manipulation
 
     Attributes:
-
+        alias (str): Alias of user for ease of identification
+        hashed_id (str): Hashed ID used for claiming users
+        public_key (str): Public Key used as address and for fetching users
+        private_key (str): Private Key used by the owner for signing
     """
+
     alias: str
     hashed_id: str
     public_key: str
     private_key: str
 
     def generate_key_pair(self):
+        """
+        Creates and sets public/private keys of user
+        """
         assert self.public_key is None, 'This user already has a public key'
         assert self.private_key is None, 'This user already has a private key'
         key_pair = RSA.generate(NUM_KEY_BITS)
@@ -71,8 +92,11 @@ class User:
 
     def sign(self, obj):
         """
+        Signs an object with a 'signature' attribute
         Only use for when you have the private key
-        :param obj: Block or Transaction to sign
+
+        Args:
+            :param obj: Block or Transaction to sign
         """
         assert valid_type(obj, 'Transaction', 'Block')
         assert obj.signature is None, 'This Message is already signed'
@@ -82,13 +106,38 @@ class User:
         obj.signature = signer.sign(hasher(obj)).hex()
 
     def public_version(self):
+        """
+        Safeguards against sending your private key to people by accident
+
+        Returns:
+            :return: Copy of user without private key
+        """
         #  this will be used in various post-inits
         copy = deepcopy(self)
         copy.private_key = None
         return copy
 
 
+def find_user(public_key):
+    for user in USERS:
+        if public_key == user['public_key']:
+            return User(user['alias'],
+                        user['hashed_id'],
+                        user['public_key'],
+                        'None')
+    else:
+        return False
+
+
 def user_from_dict(user_dict):
+    """
+    Constructs User from dictionary obj
+
+    Args
+        :param user_dict: dictionary with user fields
+    Returns:
+        :return: User object
+    """
     return User(alias=user_dict['alias'],
                 hashed_id=user_dict['hashed_id'],
                 public_key=user_dict['public_key'],
@@ -97,7 +146,12 @@ def user_from_dict(user_dict):
 
 def valid_signature(obj):
     """
-    :return: if the signature of the messages data is valid
+    Validates the signature of object with 'signature' field
+
+    Args:
+        :param obj: object with a signature
+    Return:
+        :return validity of signature
     """
     assert valid_type(obj, 'Transaction', 'Block')
     assert obj.signature is not None, "This block hasn't been signed"
@@ -124,7 +178,16 @@ def timestamp():
 class Transaction:
     """
     Class for storing transactions to allow for easy verification
+
+    Attributes:
+        sender: User object (without private key)
+        recpient: User object (without private key)
+        value: How much the sender is sending to the recipient
+        fee: How much the sender is rewarding the miner for including this transaction in a block
+        time: Timestamp at the time of creation, not used for verification
+        signature: Sender's signature of this transaction
     """
+
     sender: User
     recipient: User
     value: int
@@ -143,22 +206,28 @@ class Transaction:
             self.time = timestamp()
 
     def is_valid(self):
+        """
+        Is the transaction (by itself) valid
+
+        Returns:
+            :return: Transaction value is acceptable,
+                     signature is valid,
+                     and sender and recipient are valid users
+        """
         if self.value < TRANSACTION_MIN_VALUE:
             return False
         if not valid_signature(self):
             return False
-        sender_valid = False
-        recipient_valid = False
-        for user in USERS:
-            p_k = user['public_key']
-            if p_k == self.sender.public_key:
-                sender_valid = True
-            if p_k == self.recipient.public_key:
-                recipient_valid = True
-        return sender_valid and recipient_valid
+        return find_user(self.sender.public_key)\
+               and find_user(self.recipient.public_key)
 
 
 def transaction_from_dict(transaction_dict):
+    """
+    Recursively constructs transaction object with help of user_from_dict
+    :param transaction_dict:
+    :return:
+    """
     return Transaction(sender=user_from_dict(transaction_dict['sender']),
                        recipient=user_from_dict(transaction_dict['recipient']),
                        value=transaction_dict['value'],
@@ -170,8 +239,17 @@ def transaction_from_dict(transaction_dict):
 @dataclass
 class Block:
     """
-    Block class where the default constructor returns the genesis block
+    Block that stores proof of work
+
+    Attributes:
+        prev_hash: Hash of previous block used in Blockchain
+        miner: User (without private key) to whom the transaction fee's will go to
+        transactions: List of transactions in block
+        nonce: Nonce used for mining the block
+        time: Timestamp at the time of creation, not used for verification
+        signature: Miner's signature of this block
     """
+
     prev_hash: str
     miner: User
     transactions: List[Transaction]
@@ -217,11 +295,7 @@ class Block:
             return False
         if not valid_signature(self):
             return False
-        for user in USERS:
-            p_k = user['public_key']
-            if p_k == self.miner.public_key:
-                return True
-        return False
+        return find_user(self.miner.public_key)
 
     def mine(self):
         assert self.transactions_valid(), 'You cannot mine an invalid block'
@@ -249,6 +323,14 @@ def block_from_dict(block_dict):
 
 @dataclass
 class Blockchain:
+    """
+    List of mined blocks and unmined transactions
+
+    Attributes:
+        chain: List of mined blocks
+        transactions: List of unmined transactions (private)
+    """
+
     chain: List[Block] = None
     transactions: List[Transaction] = None
 

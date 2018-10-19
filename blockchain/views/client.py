@@ -1,7 +1,8 @@
 import requests
 from flask import render_template, redirect, flash, session
+from requests.exceptions import MissingSchema
 
-from blockchain import app, my_chain, chain_settings, MY_URL, log, me
+from blockchain import app, my_chain, chain_settings, log, config
 from blockchain.classes import *
 from blockchain.forms import TransactionForm, ClaimForm
 from blockchain.views.api import find_user
@@ -9,14 +10,19 @@ from blockchain.views.api import find_user
 
 def spread_message(api_url, json_data, success_url, fail_url):
     acceptance = {'yes': 0, 'no': 0}
+    NODES.append(app.config['MY_URL'])
     for node in NODES:
-        r = requests.post(f'{node}/api/{api_url}', json=json_data)
-        response = r.json()
-        log.append({'message': response['message'], 'time': timestamp()})
-        if r.status_code == 200:
-            acceptance['yes'] += 1
-        else:
-            acceptance['no'] += 1
+        try:
+            r = requests.post(f'{node}/api/{api_url}', json=json_data)
+            response = r.json()
+            log.append({'message': response['message'], 'time': timestamp()})
+            if r.status_code == 200:
+                acceptance['yes'] += 1
+            else:
+                acceptance['no'] += 1
+        except (MissingSchema, ValueError) as e:
+            pass
+    del NODES[-1]
     if acceptance['yes'] > acceptance['no']:
         flash('Success!', 'success')
         return redirect(success_url)
@@ -37,11 +43,6 @@ def name():
 @app.context_processor
 def base_reward():
     return {'base_reward': chain_settings.BASE_MINER_REWARD}
-
-
-@app.context_processor
-def my_url():
-    return {'my_url': MY_URL}
 
 
 @app.route('/', methods=['GET'])

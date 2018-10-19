@@ -4,17 +4,6 @@ from blockchain import app, my_chain, mine_transactions, log
 from blockchain.classes import *
 
 
-def find_user(public_key):
-    for user in USERS:
-        if public_key == user['public_key']:
-            return User(user['alias'],
-                        user['hashed_id'],
-                        user['public_key'],
-                        'None')
-    else:
-        return False
-
-
 #  GET requests go here
 @app.route('/api/chain', methods=['GET'])
 def get_chain():
@@ -35,11 +24,14 @@ def get_users():
 def get_user_info():
     user_id = request.args.get('id')
     if user_id is None:
-        print('here')
         return jsonify(message="No user id given"), 408
     hashed_id = hasher(user_id.encode()).hexdigest()
     for user in USERS:
         if user['hashed_id'] == hashed_id:
+            try:
+                user_from_dict(user)
+            except KeyError:
+                return jsonify(message="User has not been initialized"), 408
             return jsonify({
                 'alias': user['alias'],
                 'key': user['public_key'],
@@ -84,13 +76,17 @@ def accept_user():
         return jsonify(message="You did not provide the node url"), 408
     for user in USERS:
         if hasher(args['id'].encode()).hexdigest() == user['hashed_id']:
-            if 'public_key' in user:
+            if 'public_key' in user and user['public_key'] is not None:
                 return jsonify(message="This user has already been registered"), 408
             else:
+                try:
+                    RSA.import_key(args['public_key'])
+                except (ValueError, IndexError, TypeError) as e:
+                    return jsonify(message="Invalid Public Key")
                 user['public_key'] = args['public_key']
                 user['alias'] = args['alias']
-                user['private_key'] = 'None'
-                NODES.append(args['node_url'])
+                user['private_key'] = None
+                add_node(args['node_url'])
                 return jsonify(message="Success! User claimed"), 200
     else:
         return jsonify(message="That id did not match any hashed id's"), 408

@@ -123,7 +123,7 @@ def accept_transaction():
 def accept_blockchain():
     args = json.loads(request.get_json())
     try:
-        other = block_from_dict(args)
+        other = blockchain_from_dict(args)
     except TypeError:
         return jsonify(message="Stop trying to break things")
     if not other.is_valid():

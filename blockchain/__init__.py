@@ -39,7 +39,7 @@ def mine_transactions():
     my_chain.chain.append(block)
     my_chain.transactions = []
     for node in NODES:
-        requests.post(f'{node}/api/accept_blockchain',
+        requests.post(f'{node}/api/accept_chain',
                       json=to_json(my_chain))
 
 

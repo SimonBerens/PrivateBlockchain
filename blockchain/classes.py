@@ -347,7 +347,8 @@ class Blockchain:
     def compute_balances(self):
         users = dict()
         for user in USERS:
-            users[user['public_key']] = user['initial_balance']
+            if 'public_key' in user:
+                users[user['public_key']] = user['initial_balance']
         for block in self.chain:
             reward = 0
             for transaction in block.transactions:

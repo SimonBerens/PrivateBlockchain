@@ -18,6 +18,7 @@ for user in USERS:
         if 'public_key' not in user:
             user['public_key'] = me.public_key
             user['alias'] = me.alias
+            user['private_key'] = None
 
 if app.config['MY_URL'] != BOOTNODE:
     add_node(BOOTNODE)

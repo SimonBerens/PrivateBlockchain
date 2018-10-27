@@ -4,7 +4,7 @@ from flask import Flask
 from blockchain.chain_settings import *
 from blockchain.classes import *
 
-app = Flask(__name__, instance_relative_config=True)
+app = Flask(__name__, instance_relative_config=False)
 app.config.from_pyfile('config.py')
 
 me = user_from_dict(ME)
@@ -15,7 +15,7 @@ except AssertionError:
 
 for user in USERS:
     if user['hashed_id'] == me.hashed_id:
-        if user['public_key'] is None:
+        if 'public_key' not in user:
             user['public_key'] = me.public_key
             user['alias'] = me.alias
 

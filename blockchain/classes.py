@@ -120,7 +120,7 @@ class User:
 
 def find_user(public_key):
     for user in USERS:
-        if public_key == user['public_key']:
+        if 'public_key' in user and public_key == user['public_key']:
             return User(user['alias'],
                         user['hashed_id'],
                         user['public_key'],

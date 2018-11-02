@@ -8,26 +8,16 @@ app = Flask(__name__, instance_relative_config=False)
 app.config.from_pyfile('config.py')
 
 me = user_from_dict(ME)
-try:
-    me.generate_key_pair()
-except AssertionError:
-    pass
-
-for user in USERS:
-    if user['hashed_id'] == me.hashed_id:
-        if 'public_key' not in user:
-            user['public_key'] = me.public_key
-            user['alias'] = me.alias
-            user['private_key'] = None
 
 if app.config['MY_URL'] != BOOTNODE:
+    USERS = requests.get(f'{BOOTNODE}/api/users').json()
+    NODES = requests.get(f'{BOOTNODE}/api/nodes').json()
+    log = requests.get(f'{BOOTNODE}/api/nodes').json()
     add_node(BOOTNODE)
-
-my_chain = Blockchain()
-genesis_transaction = Transaction(me, me, TRANSACTION_MIN_VALUE, TOTAL_TRANSACTION_FEE)
-me.sign(genesis_transaction)
-my_chain.transactions.append(genesis_transaction)
-log = []
+    my_chain = blockchain_from_dict(requests.get(f'{BOOTNODE}/api/chain').json())
+else:
+    my_chain = Blockchain()
+    log = []
 
 
 def mine_transactions():
@@ -47,4 +37,3 @@ def mine_transactions():
 import blockchain.views.client
 import blockchain.views.api
 
-mine_transactions()

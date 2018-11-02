@@ -46,6 +46,7 @@ malicious code that takes your unhashed id and private key.
 4. If you have a preexisting list of users and/or nodes, place them into the users.json and/or nodes.json files respectively
 5. In config.py, change the url and port to the url and port of the server
 6. Run run.py from the project directory
-7. Pull the most recent list of users and nodes from the bootnode
-8. Using your predetermined unhashed ID and the generated keys in me.json claim your user
+7. Using your predetermined unhashed ID and the generated keys in me.json claim your user
+8. If you are the bootnode, generate a genesis block via submit transaction
 
+Live example [here](http://67.205.129.210)

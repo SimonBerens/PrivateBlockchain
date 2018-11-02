@@ -384,7 +384,7 @@ class Blockchain:
             if hasher(prev_block).hexdigest() != block.prev_hash:
                 return False
             prev_block = block
-        return all([balance >= 0 for user, balance in self.compute_balances()])
+        return all([balance >= 0 for user, balance in self.compute_balances().items()])
 
 
 def blockchain_from_dict(blockchain_dict):

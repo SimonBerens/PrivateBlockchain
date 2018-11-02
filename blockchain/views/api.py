@@ -76,7 +76,7 @@ def accept_user():
         return jsonify(message="You did not provide the node url"), 408
     for user in USERS:
         if hasher(args['id'].encode()).hexdigest() == user['hashed_id']:
-            if 'public_key' in user and user['public_key'] is not None:
+            if 'public_key' in user:
                 return jsonify(message="This user has already been registered"), 408
             else:
                 try:
@@ -86,7 +86,8 @@ def accept_user():
                 user['public_key'] = args['public_key']
                 user['alias'] = args['alias']
                 user['private_key'] = None
-                add_node(args['node_url'])
+                if args['node_url'] != BOOTNODE:
+                    add_node(args['node_url'])
                 return jsonify(message="Success! User claimed"), 200
     else:
         return jsonify(message="That id did not match any hashed id's"), 408

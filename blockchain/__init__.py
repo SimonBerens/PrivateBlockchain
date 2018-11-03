@@ -19,21 +19,6 @@ else:
     my_chain = Blockchain()
     log = []
 
-
-def mine_transactions():
-    prev_hash = '0' * DIFFICULTY if len(my_chain.chain) == 0 else my_chain.chain[-1].prev_hash
-    block = Block(prev_hash=prev_hash,
-                  miner=me,
-                  transactions=my_chain.transactions)
-    block.mine()
-    me.sign(block)
-    my_chain.chain.append(block)
-    my_chain.transactions = []
-    for node in NODES:
-        requests.post(f'{node}/api/accept_chain',
-                      json=to_json(my_chain))
-
-
 import blockchain.views.client
 import blockchain.views.api
 

@@ -1,6 +1,7 @@
+import requests
 from flask import jsonify, request
 
-from blockchain import app, my_chain, mine_transactions, log
+from blockchain import app, my_chain, log, DIFFICULTY, Block, me, NODES, to_json
 from blockchain.classes import *
 
 
@@ -115,7 +116,7 @@ def accept_transaction():
             total += transaction.fee
         if total >= TOTAL_TRANSACTION_FEE:
             mine_transactions()
-        return jsonify(message="Success!"), 200
+        return jsonify(message="Success! Transaction processed!"), 200
     else:
         return jsonify(message="Invalid transaction"), 408
 
@@ -129,8 +130,21 @@ def accept_blockchain():
         return jsonify(message="Stop trying to break things")
     if not other.is_valid():
         return jsonify(message="Invalid Blockchain"), 408
-    elif len(other.chain) - len(my_chain.chain) >= LENGTH_DIFFERENCE:
-        my_chain = other
+    elif (len(other.chain) - len(my_chain.chain)) >= LENGTH_DIFFERENCE:
+        my_chain.chain = other.chain
         return jsonify(message="Success! We have replaced our chain with yours"), 200
     else:
         return jsonify(message="We are not willing to take your chain"), 407
+
+
+def mine_transactions():
+    prev_hash = '0' * DIFFICULTY if len(my_chain.chain) == 0 else my_chain.chain[-1].prev_hash
+    block = Block(prev_hash=prev_hash,
+                  miner=me,
+                  transactions=my_chain.transactions)
+    block.mine()
+    me.sign(block)
+    my_chain.chain.append(block)
+    my_chain.transactions = []
+    from blockchain.views.client import spread_message
+    spread_message('accept_chain', to_json(my_chain), '/', '/', False)

@@ -38,7 +38,6 @@ if os.path.exists('users.json'):
         try:
             USERS = json.load(f)
         except ValueError:
-
             exit('Please provide a valid users.json')
 else:
     exit('Please provide a users.json')
@@ -51,8 +50,10 @@ app.config.from_pyfile('config.py')
 me = user_from_dict(ME)
 
 if app.config['MY_URL'] != BOOTNODE:
-    USERS = requests.get(f'{BOOTNODE}/api/users').json()
-    NODES = requests.get(f'{BOOTNODE}/api/nodes').json()
+    del USERS[:]
+    USERS.extend(requests.get(f'{BOOTNODE}/api/users').json())
+    del NODES[:]
+    NODES.extend(requests.get(f'{BOOTNODE}/api/nodes').json())
     log = requests.get(f'{BOOTNODE}/api/nodes').json()
     add_node(BOOTNODE)
     my_chain = blockchain_from_dict(requests.get(f'{BOOTNODE}/api/chain').json())

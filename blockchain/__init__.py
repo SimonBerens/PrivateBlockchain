@@ -2,10 +2,6 @@ import requests
 from flask import Flask
 
 from blockchain.chain_settings import *
-from blockchain.classes import *
-
-app = Flask(__name__, instance_relative_config=False)
-app.config.from_pyfile('config.py')
 
 # Setup nodes
 if os.path.exists('nodes.json'):
@@ -46,6 +42,11 @@ if os.path.exists('users.json'):
             exit('Please provide a valid users.json')
 else:
     exit('Please provide a users.json')
+
+from blockchain.classes import *
+
+app = Flask(__name__, instance_relative_config=False)
+app.config.from_pyfile('config.py')
 
 me = user_from_dict(ME)
 

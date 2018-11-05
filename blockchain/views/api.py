@@ -1,7 +1,6 @@
-import requests
 from flask import jsonify, request
 
-from blockchain import app, my_chain, log, DIFFICULTY, Block, me, NODES, to_json
+from blockchain import *
 from blockchain.classes import *
 
 

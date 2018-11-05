@@ -1,7 +1,4 @@
 #  Cryptographic strength constants
-import json
-import os
-
 DIFFICULTY = 1
 NUM_KEY_BITS = 2048
 
@@ -17,3 +14,6 @@ CHAIN_NAME = 'Private Blockchain'
 
 # Bootnode
 BOOTNODE = 'http://67.205.129.210:80'
+
+# Pull values from Bootnode at startup
+START_FROM_BOOTNODE = True

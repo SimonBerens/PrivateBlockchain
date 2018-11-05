@@ -2,7 +2,7 @@ import requests
 from flask import render_template, redirect, flash, session
 from requests.exceptions import MissingSchema
 
-from blockchain import app, my_chain, chain_settings, log, config
+from blockchain import app, my_chain, chain_settings, log, config, add_node
 from blockchain.classes import *
 from blockchain.forms import TransactionForm, ClaimForm
 from blockchain.views.api import find_user
@@ -10,8 +10,9 @@ from blockchain.views.api import find_user
 
 def spread_message(api_url, json_data, success_url, fail_url, include_self=True):
     acceptance = {'yes': 0, 'no': 0}
+    NODES.remove(app.config['MY_URL'])
     if include_self:
-        NODES.append(app.config['MY_URL'])
+        add_node(app.config['MY_URL'])
     for node in NODES:
         try:
             r = requests.post(f'{node}/api/{api_url}', json=json_data)
@@ -23,8 +24,7 @@ def spread_message(api_url, json_data, success_url, fail_url, include_self=True)
                 acceptance['no'] += 1
         except (MissingSchema, ValueError) as e:
             pass
-    if include_self:
-        del NODES[-1]
+    add_node(app.config['MY_URL'])
     if acceptance['yes'] > acceptance['no']:
         flash('Success!', 'success')
         return redirect(success_url)

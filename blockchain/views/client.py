@@ -9,6 +9,8 @@ from blockchain.views.api import find_user
 
 def spread_message(api_url, json_data, success_url, fail_url, include_self=True):
     acceptance = {'yes': 0, 'no': 0}
+    # All this adding and removing is necessary for error handling
+    add_node(app.config['MY_URL'])
     NODES.remove(app.config['MY_URL'])
     if include_self:
         add_node(app.config['MY_URL'])

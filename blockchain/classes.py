@@ -9,7 +9,9 @@ from Cryptodome.PublicKey import RSA
 from Cryptodome.Signature import pkcs1_15
 
 from blockchain.chain_settings import *
-from blockchain import USERS, NODES
+from blockchain import USERS
+
+import json
 
 
 def valid_type(obj, *args):

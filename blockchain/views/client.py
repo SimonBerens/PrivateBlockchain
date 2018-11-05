@@ -1,8 +1,7 @@
-import requests
 from flask import render_template, redirect, flash, session
 from requests.exceptions import MissingSchema
 
-from blockchain import app, my_chain, chain_settings, log, config, add_node
+from blockchain import *
 from blockchain.classes import *
 from blockchain.forms import TransactionForm, ClaimForm
 from blockchain.views.api import find_user

@@ -383,8 +383,10 @@ class Blockchain:
         for block in self.chain[1:]:
             if not block.is_valid():
                 return False
+            temp, prev_block.signature = prev_block.signature, None
             if hasher(prev_block).hexdigest() != block.prev_hash:
                 return False
+            prev_block.signature = temp
             prev_block = block
         return all([balance >= 0 for user, balance in self.compute_balances().items()])
 

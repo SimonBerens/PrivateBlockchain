@@ -50,3 +50,6 @@ malicious code that takes your unhashed id and private key.
 8. If you are the bootnode, generate a genesis block via submit transaction
 
 Live example [here](http://67.205.129.210)
+
+## Bugs
+* Race condition in accepting transactions and blocks for low difficulty  
